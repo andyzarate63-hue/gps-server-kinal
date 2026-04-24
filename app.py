@@ -1,37 +1,100 @@
 from flask import Flask, request, jsonify
 import requests
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 
-# Estos se configuran en Render para que nadie te robe el Bot
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+# ================= CONFIG =================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
+if not BOT_TOKEN or not CHAT_ID:
+    raise ValueError("Faltan variables de entorno (BOT_TOKEN o CHAT_ID)")
+
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-@app.route('/gps', methods=['POST'])
-def recibir_gps():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON"}), 400
-    
-    # Formateo del mensaje con link a Google Maps
-    mensaje = (
-        f"📍 <b>GPS - ESP32 Kinal</b>\n"
-        f"Lat: <code>{data.get('lat')}</code>\n"
-        f"Lon: <code>{data.get('lon')}</code>\n"
-        f"Alt: <code>{data.get('alt')} m</code>\n"
-        f"Vel: <code>{data.get('vel')} km/h</code>\n"
-        f"Sat: <code>{data.get('sat')}</code>\n"
-        f"🔗 <a href='http://www.google.com/maps/place/{data.get('lat')},{data.get('lon')}'>Ver en Mapa</a>"
-    )
-    
-    payload = {"chat_id": CHAT_ID, "text": mensaje, "parse_mode": "HTML"}
+# ================= FUNCIONES =================
+
+def log(msg):
+    print(f"[{datetime.now()}] {msg}")
+
+def validar_datos(data):
+    if not isinstance(data, dict):
+        return False, "JSON inválido"
+
+    if "lat" not in data or "lon" not in data:
+        return False, "Faltan campos obligatorios"
+
     try:
-        requests.post(TELEGRAM_URL, json=payload, timeout=10)
+        lat = float(data["lat"])
+        lon = float(data["lon"])
+    except:
+        return False, "Datos no numéricos"
+
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return False, "Coordenadas fuera de rango"
+
+    return True, ""
+
+def enviar_telegram(lat, lon):
+    mensaje = (
+        f"📍 GPS ESP32\n"
+        f"Lat: {lat}\n"
+        f"Lon: {lon}\n"
+        f"https://maps.google.com/?q={lat},{lon}"
+    )
+
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": mensaje
+    }
+
+    response = requests.post(
+        TELEGRAM_URL,
+        json=payload,
+        timeout=10
+    )
+
+    return response.status_code == 200
+
+# ================= RUTAS =================
+
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "status": "online",
+        "service": "GPS Tracker API"
+    }), 200
+
+
+@app.route("/gps", methods=["POST"])
+def recibir_gps():
+    try:
+        data = request.get_json()
+
+        valido, error = validar_datos(data)
+        if not valido:
+            log(f"Error validación: {error}")
+            return jsonify({"error": error}), 400
+
+        lat = float(data["lat"])
+        lon = float(data["lon"])
+
+        log(f"Datos recibidos: {lat}, {lon}")
+
+        if not enviar_telegram(lat, lon):
+            log("Error enviando a Telegram")
+            return jsonify({"error": "Fallo Telegram"}), 500
+
         return jsonify({"status": "ok"}), 200
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        log(f"Error interno: {str(e)}")
+        return jsonify({"error": "Error interno"}), 500
+
+
+# ================= MAIN =================
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
