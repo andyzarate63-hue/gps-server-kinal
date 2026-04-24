@@ -15,51 +15,69 @@ def log(msg):
 
 # ================= VALIDACIÓN =================
 def validar_datos(data):
+    if not data:
+        return False, "No se recibió JSON"
+
     if not isinstance(data, dict):
-        return False, "JSON inválido"
+        return False, "Formato inválido"
 
     if "lat" not in data or "lon" not in data:
-        return False, "Faltan campos"
+        return False, "Faltan campos obligatorios"
 
     try:
         lat = float(data["lat"])
         lon = float(data["lon"])
     except:
-        return False, "Datos inválidos"
+        return False, "Lat/Lon deben ser numéricos"
+
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return False, "Coordenadas fuera de rango"
 
     return True, ""
 
-# ================= RUTAS =================
-
-@app.route("/")
+# ================= RUTA PRINCIPAL =================
+@app.route("/", methods=["GET"])
 def home():
     return jsonify({
         "status": "online",
+        "service": "GPS Tracker API",
         "telegram_config": bool(BOT_TOKEN and CHAT_ID)
-    })
+    }), 200
 
+# ================= RUTA GPS =================
 @app.route("/gps", methods=["POST"])
 def gps():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    valido, error = validar_datos(data)
-    if not valido:
-        return jsonify({"error": error}), 400
+        valido, error = validar_datos(data)
+        if not valido:
+            log(f"Error validación: {error}")
+            return jsonify({"error": error}), 400
 
-    lat = data["lat"]
-    lon = data["lon"]
+        lat = float(data["lat"])
+        lon = float(data["lon"])
 
-    log(f"GPS recibido: {lat}, {lon}")
+        log(f"GPS recibido: {lat}, {lon}")
 
-    # 🔥 IMPORTANTE: no romper si falta telegram
-    if BOT_TOKEN and CHAT_ID:
-        if not enviar_mensaje(lat, lon):
-            return jsonify({"error": "Telegram fallo"}), 500
-    else:
-        log("Telegram no configurado")
+        # Enviar a Telegram SOLO si está configurado
+        if BOT_TOKEN and CHAT_ID:
+            enviado = enviar_mensaje(lat, lon)
+            if not enviado:
+                log("Fallo al enviar a Telegram")
+                return jsonify({"error": "Error Telegram"}), 500
+        else:
+            log("Telegram no configurado")
 
-    return jsonify({"status": "ok"}), 200
+        return jsonify({
+            "status": "ok",
+            "lat": lat,
+            "lon": lon
+        }), 200
 
+    except Exception as e:
+        log(f"Error interno: {str(e)}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 # ================= MAIN =================
 if __name__ == "__main__":
