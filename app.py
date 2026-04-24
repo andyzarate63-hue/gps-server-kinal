@@ -6,8 +6,8 @@ from telegram_service import enviar_mensaje
 app = Flask(__name__)
 
 # ================= CONFIG =================
-BOT_TOKEN = os.getenv("8777412272:AAEfK8ddW0TdlCjhD0j1bC4mm2GUKgLUJz4")
-CHAT_ID = os.getenv("8420372209")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 # ================= LOG =================
 def log(msg):
