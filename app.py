@@ -1,8 +1,13 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
+import os
 from telegram_service import enviar_mensaje
 
 app = Flask(__name__)
+
+# ================= CONFIG =================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 # ================= LOG =================
 def log(msg):
@@ -14,53 +19,46 @@ def validar_datos(data):
         return False, "JSON inválido"
 
     if "lat" not in data or "lon" not in data:
-        return False, "Faltan campos obligatorios"
+        return False, "Faltan campos"
 
     try:
         lat = float(data["lat"])
         lon = float(data["lon"])
     except:
-        return False, "Datos no numéricos"
-
-    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-        return False, "Coordenadas fuera de rango"
+        return False, "Datos inválidos"
 
     return True, ""
 
 # ================= RUTAS =================
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return jsonify({
         "status": "online",
-        "service": "GPS Tracker API"
-    }), 200
-
+        "telegram_config": bool(BOT_TOKEN and CHAT_ID)
+    })
 
 @app.route("/gps", methods=["POST"])
-def recibir_gps():
-    try:
-        data = request.get_json()
+def gps():
+    data = request.get_json()
 
-        valido, error = validar_datos(data)
-        if not valido:
-            log(f"Error validación: {error}")
-            return jsonify({"error": error}), 400
+    valido, error = validar_datos(data)
+    if not valido:
+        return jsonify({"error": error}), 400
 
-        lat = float(data["lat"])
-        lon = float(data["lon"])
+    lat = data["lat"]
+    lon = data["lon"]
 
-        log(f"Datos recibidos: {lat}, {lon}")
+    log(f"GPS recibido: {lat}, {lon}")
 
+    # 🔥 IMPORTANTE: no romper si falta telegram
+    if BOT_TOKEN and CHAT_ID:
         if not enviar_mensaje(lat, lon):
-            log("Error enviando a Telegram")
-            return jsonify({"error": "Fallo Telegram"}), 500
+            return jsonify({"error": "Telegram fallo"}), 500
+    else:
+        log("Telegram no configurado")
 
-        return jsonify({"status": "ok"}), 200
-
-    except Exception as e:
-        log(f"Error interno: {str(e)}")
-        return jsonify({"error": "Error interno"}), 500
+    return jsonify({"status": "ok"}), 200
 
 
 # ================= MAIN =================
