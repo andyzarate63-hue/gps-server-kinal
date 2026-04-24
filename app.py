@@ -1,24 +1,14 @@
 from flask import Flask, request, jsonify
-import requests
-import os
 from datetime import datetime
+from telegram_service import enviar_mensaje
 
 app = Flask(__name__)
 
-# ================= CONFIG =================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-
-if not BOT_TOKEN or not CHAT_ID:
-    raise ValueError("Faltan variables de entorno (BOT_TOKEN o CHAT_ID)")
-
-TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-
-# ================= FUNCIONES =================
-
+# ================= LOG =================
 def log(msg):
     print(f"[{datetime.now()}] {msg}")
 
+# ================= VALIDACIÓN =================
 def validar_datos(data):
     if not isinstance(data, dict):
         return False, "JSON inválido"
@@ -36,27 +26,6 @@ def validar_datos(data):
         return False, "Coordenadas fuera de rango"
 
     return True, ""
-
-def enviar_telegram(lat, lon):
-    mensaje = (
-        f"📍 GPS ESP32\n"
-        f"Lat: {lat}\n"
-        f"Lon: {lon}\n"
-        f"https://maps.google.com/?q={lat},{lon}"
-    )
-
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": mensaje
-    }
-
-    response = requests.post(
-        TELEGRAM_URL,
-        json=payload,
-        timeout=10
-    )
-
-    return response.status_code == 200
 
 # ================= RUTAS =================
 
@@ -83,7 +52,7 @@ def recibir_gps():
 
         log(f"Datos recibidos: {lat}, {lon}")
 
-        if not enviar_telegram(lat, lon):
+        if not enviar_mensaje(lat, lon):
             log("Error enviando a Telegram")
             return jsonify({"error": "Fallo Telegram"}), 500
 
@@ -95,6 +64,5 @@ def recibir_gps():
 
 
 # ================= MAIN =================
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
