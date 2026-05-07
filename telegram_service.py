@@ -1,34 +1,49 @@
 import requests
 import os
+from datetime import datetime
+import time
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-def enviar_mensaje(lat, lon, device_id, timestamp):
+
+def construir_mensaje(lat, lon, device_id, timestamp):
+    maps = f"https://maps.google.com/?q={lat},{lon}"
+
+    return (
+        f"📍 GPS TRACKER\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"ID: {device_id}\n"
+        f"Hora: {timestamp}\n"
+        f"Lat: {lat}\n"
+        f"Lon: {lon}\n"
+        f"Mapa: {maps}\n"
+        f"━━━━━━━━━━━━━━━"
+    )
+
+
+def enviar_mensaje(lat, lon, device_id, timestamp, intentos=3):
 
     if not BOT_TOKEN or not CHAT_ID:
         return False
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    maps = f"https://maps.google.com/?q={lat},{lon}"
+    mensaje = construir_mensaje(lat, lon, device_id, timestamp)
 
-    text = (
-        f"📍 TRACKER ACTIVADO\n"
-        f"ID: {device_id}\n"
-        f"Hora: {timestamp}\n"
-        f"Lat: {lat}\n"
-        f"Lon: {lon}\n"
-        f"Mapa: {maps}"
-    )
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": mensaje
+    }
 
-    try:
-        r = requests.post(url, json={
-            "chat_id": CHAT_ID,
-            "text": text
-        }, timeout=10)
+    for i in range(intentos):
+        try:
+            r = requests.post(url, json=payload, timeout=10)
 
-        return r.status_code == 200
+            if r.status_code == 200:
+                return True
 
-    except:
-        return False
+        except Exception as e:
+            time.sleep(1)
+
+    return False
