@@ -1,8 +1,15 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 import os
+
 from telegram_service import enviar_mensaje
-from database import init_db, insert_location, get_history
+from database import (
+    init_db,
+    insert_location,
+    get_history,
+    get_last_location,
+    get_last_seen
+)
 
 app = Flask(__name__)
 
@@ -11,8 +18,8 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 init_db()
 
+# ================= VALIDACIÓN =================
 def validar_datos(data):
-
     if not data:
         return False, "No JSON"
 
@@ -31,12 +38,28 @@ def validar_datos(data):
     return True, ""
 
 
+# ================= DUPLICADOS =================
+def es_duplicado(device_id, lat, lon):
+    last = get_last_location(device_id)
+
+    if not last:
+        return False
+
+    last_lat, last_lon = last[0], last[1]
+
+    if abs(last_lat - lat) < 0.00005 and abs(last_lon - lon) < 0.00005:
+        return True
+
+    return False
+
+
+# ================= HOME =================
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"status": "online"}), 200
 
 
-# ===================== GPS INPUT =====================
+# ================= GPS =================
 @app.route("/gps", methods=["POST"])
 def gps():
 
@@ -53,10 +76,11 @@ def gps():
         sat = data.get("sat", 0)
         timestamp = datetime.utcnow().isoformat()
 
-        # 🔥 1. GUARDAR EN BASE DE DATOS (NUEVO)
+        if es_duplicado(device_id, lat, lon):
+            return jsonify({"status": "ignored_duplicate"}), 200
+
         insert_location(device_id, lat, lon, sat, timestamp)
 
-        # 🔥 2. TELEGRAM
         if BOT_TOKEN and CHAT_ID:
             enviar_mensaje(lat, lon, device_id, timestamp)
 
@@ -73,11 +97,33 @@ def gps():
         return jsonify({"error": str(e)}), 500
 
 
-# ===================== HISTORIAL (NUEVO) =====================
+# ================= ÚLTIMA UBICACIÓN =================
+@app.route("/last/<device_id>", methods=["GET"])
+def last_location(device_id):
+
+    last = get_last_location(device_id)
+    seen = get_last_seen(device_id)
+
+    if not last:
+        return jsonify({"error": "no data"}), 404
+
+    lat, lon, sat, timestamp = last
+
+    return jsonify({
+        "device_id": device_id,
+        "lat": lat,
+        "lon": lon,
+        "sat": sat,
+        "last_seen": seen,
+        "map": f"https://maps.google.com/?q={lat},{lon}"
+    })
+
+
+# ================= HISTORIAL =================
 @app.route("/history/<device_id>", methods=["GET"])
 def history(device_id):
 
-    limit = request.args.get("limit", 50)
+    limit = int(request.args.get("limit", 50))
 
     data = get_history(device_id, limit)
 
@@ -93,6 +139,30 @@ def history(device_id):
             }
             for row in data
         ]
+    })
+
+
+# ================= STATUS =================
+@app.route("/status/<device_id>", methods=["GET"])
+def status(device_id):
+
+    last_seen = get_last_seen(device_id)
+
+    if not last_seen:
+        return jsonify({"status": "offline"}), 404
+
+    last_time = datetime.fromisoformat(last_seen)
+    now = datetime.utcnow()
+
+    diff = (now - last_time).total_seconds()
+
+    state = "online" if diff < 60 else "offline"
+
+    return jsonify({
+        "device_id": device_id,
+        "status": state,
+        "last_seen": last_seen,
+        "seconds_since_last": diff
     })
 
 
