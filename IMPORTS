@@ -1,7 +1,0 @@
-from database import (
-    init_db,
-    insert_location,
-    get_history,
-    get_last_location,
-    get_last_seen
-)
