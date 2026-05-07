@@ -2,14 +2,14 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 import os
 from telegram_service import enviar_mensaje
+from database import init_db, insert_location, get_history
 
 app = Flask(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-def log(msg):
-    print(f"[{datetime.now()}] {msg}")
+init_db()
 
 def validar_datos(data):
 
@@ -30,11 +30,13 @@ def validar_datos(data):
 
     return True, ""
 
+
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"status": "online"}), 200
 
 
+# ===================== GPS INPUT =====================
 @app.route("/gps", methods=["POST"])
 def gps():
 
@@ -51,10 +53,10 @@ def gps():
         sat = data.get("sat", 0)
         timestamp = datetime.utcnow().isoformat()
 
-        log(f"{device_id}: {lat}, {lon}")
+        # 🔥 1. GUARDAR EN BASE DE DATOS (NUEVO)
+        insert_location(device_id, lat, lon, sat, timestamp)
 
-        maps = f"https://maps.google.com/?q={lat},{lon}"
-
+        # 🔥 2. TELEGRAM
         if BOT_TOKEN and CHAT_ID:
             enviar_mensaje(lat, lon, device_id, timestamp)
 
@@ -64,13 +66,34 @@ def gps():
             "lat": lat,
             "lon": lon,
             "sat": sat,
-            "time": timestamp,
-            "map": maps
+            "time": timestamp
         }), 200
 
     except Exception as e:
-        log(str(e))
-        return jsonify({"error": "server error"}), 500
+        return jsonify({"error": str(e)}), 500
+
+
+# ===================== HISTORIAL (NUEVO) =====================
+@app.route("/history/<device_id>", methods=["GET"])
+def history(device_id):
+
+    limit = request.args.get("limit", 50)
+
+    data = get_history(device_id, limit)
+
+    return jsonify({
+        "device_id": device_id,
+        "count": len(data),
+        "history": [
+            {
+                "lat": row[0],
+                "lon": row[1],
+                "sat": row[2],
+                "timestamp": row[3]
+            }
+            for row in data
+        ]
+    })
 
 
 if __name__ == "__main__":
