@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 # Variables de entorno
 # El segundo valor es el que se usa si no configuras nada en el panel de Render
-API_KEY = os.getenv("API_KEY", "gps123") 
+API_KEY = os.getenv("API_KEY", "gps123")
 
 # Inicializamos la base de datos al arrancar
 init_db()
