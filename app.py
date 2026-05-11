@@ -97,6 +97,6 @@ def gps():
         return jsonify({"status": "server_error", "details": str(e)}), 500
 
 if __name__ == "__main__":
-    # CAMBIO: Usamos el puerto 10000 por defecto, que es el preferido por Render
-    port = int(os.environ.get("PORT", 10000))
+    # Render asigna el puerto en la variable de entorno 'PORT'
+    port = int(os.environ.get("PORT", 5000)) 
     app.run(host="0.0.0.0", port=port)
