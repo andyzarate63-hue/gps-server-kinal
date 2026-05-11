@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import os
 import logging
 
+# Importamos las funciones de tus otros archivos
 from telegram_service import enviar_mensaje
 from database import (
     init_db,
@@ -19,8 +20,10 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Variables de entorno
-API_KEY = os.getenv("API_KEY", "gps123") # Valor por defecto si no se configura
+# El segundo valor es el que se usa si no configuras nada en el panel de Render
+API_KEY = os.getenv("API_KEY", "gps123") 
 
+# Inicializamos la base de datos al arrancar
 init_db()
 
 def validar_datos(data):
@@ -51,7 +54,7 @@ def es_duplicado(device_id, lat, lon):
         return False
     
     last_lat, last_lon, _, _ = last
-    # Umbral de movimiento: aprox 8-10 metros para evitar saltos por error de GPS
+    # Filtro de movimiento (aprox 8-10 metros)
     if abs(last_lat - lat) < 0.00008 and abs(last_lon - lon) < 0.00008:
         return True
     return False
@@ -74,13 +77,16 @@ def gps():
         lat = round(float(data["lat"]), 6)
         lon = round(float(data["lon"]), 6)
         sat = int(data.get("sat", 0))
+        # Usamos hora UTC para evitar confusiones de zona horaria
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
         if es_duplicado(device_id, lat, lon):
             return jsonify({"status": "ignored", "reason": "static_position"}), 200
 
-        # Guardar y Notificar
+        # 1. Guardar en SQLite
         insert_location(device_id, lat, lon, sat, timestamp)
+        
+        # 2. Notificar a Telegram
         enviar_mensaje(lat, lon, device_id, timestamp, sat)
 
         logger.info(f"📍 Ubicación recibida de {device_id}")
@@ -91,4 +97,6 @@ def gps():
         return jsonify({"status": "server_error", "details": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 80)))
+    # CAMBIO: Usamos el puerto 10000 por defecto, que es el preferido por Render
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
