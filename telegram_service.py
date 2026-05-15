@@ -1,7 +1,7 @@
 import requests
 
 # CREDENCIALES VERIFICADAS
-BOT_TOKEN = "8777412272:AAFPqyY5eeObXoM4DUS18amhuBd-A5ILNms"
+BOT_TOKEN = "8777412272:AAE5JJFj39yL6QtWPx-d3mBHvBn1mD6DFhM"
 CHAT_ID = "8420372209"
 
 def enviar_mensaje(lat, lon, device_id, timestamp, sat):
