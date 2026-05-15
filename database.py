@@ -9,25 +9,17 @@ def get_connection():
 
 def init_db():
     with get_connection() as conn:
-        c = conn.cursor()
-        c.execute("""
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                device_id TEXT NOT NULL,
-                lat REAL NOT NULL,
-                lon REAL NOT NULL,
-                sat INTEGER DEFAULT 0,
-                timestamp TEXT NOT NULL
+                device_id TEXT, lat REAL, lon REAL, sat INTEGER, timestamp TEXT
             )
         """)
-        conn.commit()
 
 def insert_location(device_id, lat, lon, sat, timestamp):
     with get_connection() as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO locations (device_id, lat, lon, sat, timestamp) VALUES (?, ?, ?, ?, ?)",
-                  (device_id, lat, lon, sat, timestamp))
-        conn.commit()
+        conn.execute("INSERT INTO locations (device_id, lat, lon, sat, timestamp) VALUES (?, ?, ?, ?, ?)",
+                     (device_id, lat, lon, sat, timestamp))
 
 def get_last_location(device_id):
     with get_connection() as conn:
