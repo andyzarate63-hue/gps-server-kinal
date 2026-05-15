@@ -4,6 +4,7 @@ DB_NAME = "gps_data.db"
 
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
+    # WAL mode mejora el rendimiento en escrituras simultáneas
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
@@ -26,12 +27,18 @@ def init_db():
 def insert_location(device_id, lat, lon, sat, timestamp):
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("INSERT INTO locations (device_id, lat, lon, sat, timestamp) VALUES (?, ?, ?, ?, ?)",
-                  (device_id, lat, lon, sat, timestamp))
+        c.execute("""
+            INSERT INTO locations (device_id, lat, lon, sat, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+        """, (device_id, lat, lon, sat, timestamp))
         conn.commit()
 
 def get_last_location(device_id):
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("SELECT lat, lon FROM locations WHERE device_id = ? ORDER BY id DESC LIMIT 1", (device_id,))
+        c.execute("""
+            SELECT lat, lon FROM locations 
+            WHERE device_id = ? 
+            ORDER BY id DESC LIMIT 1
+        """, (device_id,))
         return c.fetchone()
