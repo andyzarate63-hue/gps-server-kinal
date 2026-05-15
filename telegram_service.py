@@ -6,18 +6,18 @@ def enviar_mensaje(lat, lon, device_id, timestamp, sat):
     chat_id = os.getenv("CHAT_ID")
     
     if not token or not chat_id:
-        print("⚠️ Faltan variables de entorno para Telegram")
         return False
 
-    # URL universal para mapas (corregida)
-    maps_url = f"http://maps.google.com/maps?q={lat},{lon}"
+    # Este formato de URL es el que mejor acepta Telegram para mostrar el mapa
+    maps_url = f"https://www.google.com/maps?q={lat},{lon}"
     
     mensaje = (
-        f"🛰 **GPS TRACKER: {device_id}**\n"
+        f"🛰 **UBICACIÓN DETECTADA**\n"
         f"━━━━━━━━━━━━━━━\n"
+        f"🆔 **ID:** `{device_id}`\n"
         f"📡 **Sats:** {sat}\n"
         f"⏰ **Hora:** {timestamp} UTC\n"
-        f"📍 **Ubicación:** `{lat}, {lon}`\n"
+        f"📍 **Coordenadas:** `{lat}, {lon}`\n"
         f"━━━━━━━━━━━━━━━\n"
         f"🗺 [VER EN GOOGLE MAPS]({maps_url})"
     )
@@ -32,6 +32,5 @@ def enviar_mensaje(lat, lon, device_id, timestamp, sat):
     try:
         r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json=payload, timeout=10)
         return r.status_code == 200
-    except Exception as e:
-        print(f"Error de conexión con Telegram: {e}")
+    except:
         return False
