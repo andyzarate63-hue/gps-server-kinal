@@ -1,39 +1,36 @@
 import requests
 import os
 
-def enviar_mensaje(lat, lon, device_id, timestamp, sat):
-    # Se obtienen de las variables de entorno de Render
-    token = os.getenv("BOT_TOKEN")
-    chat_id = os.getenv("CHAT_ID")
-    
-    if not token or not chat_id:
-        print("⚠️ Error: BOT_TOKEN o CHAT_ID no configurados en Render")
-        return False
+# --- TOKEN ACTUALIZADO ---
+BOT_TOKEN = "8777412272:AAFPqyY5eeObXoM4DUS18amhuBd-A5ILNms"
+CHAT_ID = "8420372209"
 
-    # URL universal corregida para Google Maps
-    maps_url = f"https://www.google.com/maps?q={lat},{lon}"
+def enviar_mensaje(lat, lon, device_id, timestamp, sat):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    
+    # URL Estándar de Google Maps
+    google_maps_url = f"https://www.google.com/maps?q={lat},{lon}"
     
     mensaje = (
-        f"🛰 **RASTREO GPS ACTIVO**\n"
+        f"🛰 **GPS TRACKER: {device_id}**\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"🆔 **ID:** `{device_id}`\n"
-        f"📡 **Satélites:** {sat}\n"
+        f"📡 **Sats:** {sat}\n"
         f"⏰ **Hora:** {timestamp} UTC\n"
-        f"📍 **Posición:** `{lat}, {lon}`\n"
+        f"📍 **Ubicación:** `{lat}, {lon}`\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"🗺 [VER EN GOOGLE MAPS]({maps_url})"
+        f"🗺 [VER EN GOOGLE MAPS]({google_maps_url})"
     )
 
     payload = {
-        "chat_id": chat_id,
+        "chat_id": CHAT_ID,
         "text": mensaje,
         "parse_mode": "Markdown",
         "disable_web_page_preview": False
     }
 
     try:
-        response = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
         return response.status_code == 200
     except Exception as e:
-        print(f"❌ Error enviando a Telegram: {e}")
+        print(f"Error Telegram: {e}")
         return False
